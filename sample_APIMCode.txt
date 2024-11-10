@@ -1,0 +1,43 @@
+<policies>
+    <inbound>
+        <!-- Check if the request originates from an allowed IP -->
+        <check-header name="x-forwarded-for" failed-check-httpcode="403" failed-check-error-message="Forbidden IP">
+            <value>203.0.113.10</value>
+            <value>203.0.113.20</value>
+            <value>106.219.183.88</value>
+            <value>14.195.195.94</value>
+        </check-header>
+        <!-- Rate limiting to allow 20 requests per 10 seconds and 100 requests per minute -->
+        <rate-limit-by-key calls="20" renewal-period="10" counter-key="@(context.Request.IpAddress)" />
+        <rate-limit-by-key calls="100" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
+    </inbound>
+    <backend>
+        <!-- Setting the function key for the first function app in backend call -->
+        <set-header name="x-functions-key" exists-action="override">
+            <value>https://appfuncai01.azurewebsites.net/api/appfunchttpt01?code=sxp5zHzfrlFpVkU7vHc1NABt8rhn1U-Y-56NnqZmd9BDAzFumqHqRw%3D%3D</value>
+        </set-header>
+    </backend>
+    <outbound>
+        <base />
+        <!-- Conditional execution for the second function app based on the first function's response -->
+        <choose>
+            <when condition="@(context.Response.StatusCode == 200)">
+                <!-- Trigger the second function if the first function call is successful -->
+                <send-request mode="new" response-variable-name="secondFunctionResponse">
+                    <set-url>https://appfuncai02.azurewebsites.net/api/appfuncaihttpt02?code=RkrAGH5nlu-yBG-mU85g6f4d9whI_Wcui1G66cKXdeC6AzFuNjOWjA%3D%3D</set-url>
+                    <set-method>POST</set-method>
+                </send-request>
+            </when>
+            <!-- Handle cases where the first function returns an error -->
+            <otherwise>
+                <return-response>
+                    <set-status code="500" reason="Error" />
+                    <set-body>Error triggering the second function.</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>
